@@ -1217,7 +1217,7 @@ function lineaDesdeTexto(texto, desde) {
 const H = {};
 for (const k of CLAVES) {
   H[k] = {
-    k, P: P[k], conv: null, lip: nuevaLip(), modo: 'quieta', hablo: false, texto: '', gate: false, finTimer: null, conectado: false, fijo: null,
+    k, P: P[k], conv: null, lip: nuevaLip(), modo: 'quieta', hablo: false, texto: '', gate: false, permitido: false, esperas: 0, finTimer: null, conectado: false, fijo: null,
     st: { parpadeo: 0, proxParpadeo: rnd(1, 4), cabezaYaw: 0, cabezaPitch: 0, cabezaRoll: 0, pose: 'apoyo', proxPose: 0, cejas: 0, cejasObj: 0, anteojosBaja: 0, anteojosObj: 0, proxEnfasis: 0, sorbo: 0, proxSorbo: k === 'mirta' ? 7 : 3, energia: 0, asiente: 0, mira: null },
     miraA: null
   };
@@ -1309,8 +1309,15 @@ for (const [b, s] of [[ui.camG, 'general'], [ui.camM, 'mirta'], [ui.camR, 'ramon
 /* ============================================================
    Motor de turnos
    ============================================================ */
-const D = { vivo: false, conectando: false, mic: null, receptor: null, rondas: 0, pausa: false, hablaK: null, ultimo: null, saludando: false, historia: null, espera: null, offline: false, offToken: 0 };
+const D = { palabra: null, usuarioDijo: null, abre: null, keep: null, vivo: false, conectando: false, mic: null, receptor: null, rondas: 0, pausa: false, hablaK: null, ultimo: null, saludando: false, historia: null, espera: null, offline: false, offToken: 0 };
 const ESTADOS_MIC = () => { pintarIndicadores(); };
+/* Palabra: solo se escucha (y cuenta como turno) al agente a quien le toca. Si el otro habla solo
+   (por ejemplo, un «¿estás ahí?» por silencio), se lo silencia y se lo ignora. */
+function setVol(h, v) { try { h.conv && h.conv.setVolume({ volume: v }); } catch (e) { } }
+function dar(k) {
+  const h = H[k]; clearTimeout(h.finTimer);
+  h.permitido = true; h.gate = false; h.hablo = false; h.texto = ''; h.esperas = 0; D.palabra = k; setVol(h, 1);
+}
 function mic(k) {
   D.mic = k;
   for (const x of CLAVES) { const c = H[x].conv; if (c) { try { c.setMicMuted(x !== k); } catch (e) { } } }
@@ -1329,35 +1336,44 @@ function armarEspera(k) {
   D.espera = setTimeout(() => { if (!H[k].hablando) { setEstado('Nadie contestó. Hablales vos.', 'aviso'); abrirParaUsuario(otro(k)); } }, 16000);
 }
 function abrirParaUsuario(ultimoK) {
-  clearTimeout(D.espera);
+  clearTimeout(D.espera); clearTimeout(D.abre);
   if (!D.vivo) return;
   D.rondas = 0; D.historia && (D.historia.activa = D.historia.activa && !D.historia.pausada);
   const r = D.receptor || otro(ultimoK || 'ramon');
-  mic(r);
+  // un instante de pausa para que el eco del parlante no entre al micrófono
+  D.abre = setTimeout(() => { if (D.vivo && !CLAVES.some(x => H[x].hablando && !H[x].gate)) mic(r); }, 700);
   setEstado(`Te escucha ${AGENTES[r].nombre}. Hablá cuando quieras.`, 'escucha');
   ui.txt.disabled = ui.enviar.disabled = false;
 }
 function pasarPalabra(k, texto) {
   const o = otro(k);
   D.rondas++; mic(null);
-  const msg = `${AGENTES[k].nombre} acaba de decir: "${texto}". Contestale con tu estilo, en 1 a 3 oraciones cortas, y no repitas lo que ya se dijo.`;
+  const antes = D.usuarioDijo ? ` Antes, el visitante le había dicho a ${AGENTES[D.usuarioDijo.a].nombre}: "${D.usuarioDijo.texto}".` : '';
+  D.usuarioDijo = null;
+  const msg = `${AGENTES[k].nombre} acaba de decir: "${texto}".${antes} Contestale con tu estilo, en 1 a 3 oraciones cortas, y no repitas lo que ya se dijo.`;
+  dar(o);
   try { H[o].conv.sendUserMessage(msg); armarEspera(o); setEstado(`${AGENTES[o].nombre} está por contestar…`, ''); }
   catch (e) { abrirParaUsuario(k); }
 }
 function finDeTurno(k) {
   const h = H[k];
-  if (!h.hablo) return;
-  h.hablo = false;
-  if (h.gate) { h.gate = false; try { h.conv.setVolume({ volume: 1 }); } catch (e) { } h.texto = ''; return; }
+  if (!h.hablo || !h.conv) return;
+  // si todavía suena audio, esperar un poco más antes de pasar la palabra
+  let vol = 0; try { vol = h.conv.getOutputVolume() || 0; } catch (e) { }
+  if (!h.gate && vol > 0.04 && ((h.esperas = (h.esperas || 0) + 1) < 12)) { clearTimeout(h.finTimer); h.finTimer = setTimeout(() => finDeTurno(k), 300); return; }
+  h.esperas = 0; h.hablo = false;
+  if (!h.permitido) { h.gate = false; setVol(h, 1); h.texto = ''; return; } // habló sin que le tocara: se ignora
+  h.permitido = false; if (D.palabra === k) D.palabra = null;
   const texto = (h.texto || '').trim(); h.texto = '';
   D.ultimo = { k, texto };
   if (D.pausa) return;
   if (D.saludando) {
     if (k === 'ramon') { // Mirta saluda después de Ramón
+      dar('mirta');
       try { H.mirta.conv.sendUserMessage(`Ramón acaba de saludar al visitante en la vereda. Saludá vos también al visitante y a Ramón, con tu estilo, en una o dos oraciones. Es una tarde en la vereda de Ramón, en El Colorado.`); armarEspera('mirta'); } catch (e) { }
       return;
     }
-    D.saludando = false; abrirParaUsuario(k); return;
+    D.saludando = false; // terminó el saludo: ahora charlan entre ellos un rato
   }
   if (D.historia && D.historia.activa) { avanzarHistoria(texto); return; }
   if (ui.charlar.checked && D.rondas < RONDAS_MAX - 1 && texto) { pasarPalabra(k, texto); return; }
@@ -1373,19 +1389,17 @@ function quieroHablar() {
 }
 function alUsuario(k, texto) {
   anotar('vos', texto); subtitulo('mirta', ''); ui.sub.classList.remove('on');
-  const o = otro(k);
-  try { H[o].conv.sendContextualUpdate(`El visitante le dijo a ${AGENTES[k].nombre}: "${texto}". Si después te toca contestar, hacelo con tu estilo.`); } catch (e) { }
-  D.rondas = 0; D.pausa = false; clearTimeout(D.espera);
-  mic(k); // sigue abierto hasta que conteste
+  D.usuarioDijo = { a: k, texto }; D.rondas = 0; D.pausa = false; clearTimeout(D.espera); clearTimeout(D.abre);
+  dar(k); armarEspera(k); // le toca contestar a quien te escuchó; el otro se entera en su próximo turno
 }
 function enviarTexto(texto) {
   if (!D.vivo) return;
   const sel = ui.para.value;
   const k = sel === 'ambos' ? (D.receptor || otro(D.ultimo ? D.ultimo.k : 'ramon')) : sel;
-  const o = otro(k);
   try {
+    clearTimeout(D.abre); dar(k);
     H[k].conv.sendUserMessage(sel === 'ambos' ? texto + ' (les hablo a los dos)' : texto);
-    H[o].conv.sendContextualUpdate(`El visitante le dijo a ${AGENTES[k].nombre}: "${texto}".`);
+    D.usuarioDijo = { a: k, texto };
     anotar('vos', texto); D.rondas = 0; D.pausa = false; mic(null); armarEspera(k);
   } catch (e) { setEstado('No se pudo mandar el mensaje. Probá de nuevo.', 'error'); }
 }
@@ -1423,7 +1437,7 @@ function darBeat(i, previo) {
   if (b.cue !== undefined) cue(b.cue);
   if (b.cam && CAM.auto) cortar(b.cam, 3.6);
   ui.paso.textContent = `Escena ${Math.min(i + 1, 7)} de 7 · La camioneta misteriosa`;
-  mic(null); D.pausa = false;
+  mic(null); D.pausa = false; clearTimeout(D.abre); dar(b.k);
   try { H[b.k].conv.sendUserMessage(b.dir(previo || '')); armarEspera(b.k); setEstado(`${AGENTES[b.k].nombre} está por hablar…`, ''); }
   catch (e) { setEstado('No se pudo seguir la historia. Probá de nuevo.', 'error'); }
 }
@@ -1516,9 +1530,9 @@ async function cargarSDK() {
   for (const u of SDK_URLS) { try { return await import(u); } catch (e) { console.warn('No cargó', u, e); } }
   throw new Error('sdk');
 }
-async function conectar(sdk, k, gate) {
+async function conectar(sdk, k, silenciado) {
   const h = H[k];
-  h.gate = gate; h.hablo = false; h.texto = ''; h.hablando = false;
+  h.gate = silenciado; h.permitido = !silenciado; h.hablo = false; h.texto = ''; h.hablando = false; h.esperas = 0;
   h.conv = await sdk.Conversation.startSession({
     agentId: AGENTES[k].id,
     connectionType: 'websocket',
@@ -1527,25 +1541,29 @@ async function conectar(sdk, k, gate) {
     onError: (m) => { console.error(m); setEstado('Hubo un problema con ' + AGENTES[k].nombre + '. Revisá internet y que el agente sea público.', 'error'); },
     onModeChange: ({ mode }) => {
       if (mode === 'speaking') {
-        h.hablando = true; h.hablo = true; clearTimeout(h.finTimer); clearTimeout(D.espera);
-        if (!h.gate) { D.hablaK = k; camaraAuto(k); if (!D.pausa) mic(null); setEstado(`${AGENTES[k].nombre} está hablando.`, 'habla'); }
+        h.hablando = true; h.hablo = true; clearTimeout(h.finTimer);
+        if (!h.permitido) { h.gate = true; setVol(h, 0); } // habló solo: no se escucha ni cuenta como turno
+        else { h.gate = false; clearTimeout(D.espera); D.hablaK = k; camaraAuto(k); if (!D.pausa) mic(null); setEstado(`${AGENTES[k].nombre} está hablando.`, 'habla'); }
       } else {
-        h.hablando = false; limpiarLinea(h.lip); clearTimeout(h.finTimer); h.finTimer = setTimeout(() => finDeTurno(k), 800);
+        h.hablando = false; limpiarLinea(h.lip); clearTimeout(h.finTimer); h.finTimer = setTimeout(() => finDeTurno(k), 1100);
         if (!h.gate && D.hablaK === k) D.hablaK = null;
       }
       actualizarModos();
     },
     onMessage: (m) => {
-      const quien = m.source || m.role; const texto = m.message || m.text || '';
+      const quien = m.source || m.role; const texto = (m.message || m.text || '').trim();
       if (!texto) return;
-      if (quien === 'user') { alUsuario(k, texto); return; }
-      h.texto = texto;
-      if (!h.gate) { anotar(k, texto); subtitulo(k, texto); }
+      if (quien === 'user') { // «...» es el aviso de silencio de ElevenLabs, no tu voz; y solo vale lo que dijiste mientras te escucha
+        if (/^[.\u2026\s]+$/.test(texto) || D.mic !== k || !D.vivo) return;
+        alUsuario(k, texto); return;
+      }
+      if (!h.permitido) return; // lo que dice sin que le toque no cuenta
+      h.gate = false; h.hablo = true; h.texto = texto; anotar(k, texto); subtitulo(k, texto);
     },
-    onAudioAlignment: (al) => { if (!h.gate) sumarAlineacion(h.lip, al); }
+    onAudioAlignment: (al) => { if (!h.gate && h.permitido) sumarAlineacion(h.lip, al); }
   });
   try { h.conv.setMicMuted(true); } catch (e) { }
-  if (gate) { try { h.conv.setVolume({ volume: 0 }); } catch (e) { } }
+  if (silenciado) setVol(h, 0);
 }
 async function empezar() {
   if (D.conectando || D.vivo) return;
@@ -1565,14 +1583,16 @@ async function empezar() {
     ui.receptor.textContent = 'Hablarle a Ramón';
     setEstado('Don Ramón te está saludando…', 'habla');
     armarEspera('ramon');
+    clearInterval(D.keep); // avisa a quien espera su turno que no hace falta que hable: evita sus «¿estás ahí?»
+    D.keep = setInterval(() => { for (const x of CLAVES) { const h = H[x]; if (h.conv && !h.hablando && !h.permitido && typeof h.conv.sendUserActivity === 'function') { try { h.conv.sendUserActivity(); } catch (e) { } } } }, 4000);
   } catch (e) {
     console.error(e); terminar('No pudieron atender. Revisá que los dos agentes sean públicos en ElevenLabs y probá de nuevo.', true);
   }
   D.conectando = false; ui.empezar.disabled = false;
 }
 async function terminar(msg, error) {
-  D.vivo = false; clearTimeout(D.espera);
-  for (const k of CLAVES) { const h = H[k]; clearTimeout(h.finTimer); const c = h.conv; h.conv = null; h.conectado = false; h.hablando = false; h.gate = false; h.lip.fuente = null; limpiarLinea(h.lip); if (c) { try { await c.endSession(); } catch (e) { } } }
+  D.vivo = false; clearTimeout(D.espera); clearTimeout(D.abre); clearInterval(D.keep); D.palabra = null; D.usuarioDijo = null;
+  for (const k of CLAVES) { const h = H[k]; clearTimeout(h.finTimer); const c = h.conv; h.conv = null; h.conectado = false; h.hablando = false; h.gate = false; h.permitido = false; h.lip.fuente = null; limpiarLinea(h.lip); if (c) { try { await c.endSession(); } catch (e) { } } }
   D.mic = null; D.historia = null; D.saludando = false; D.pausa = false; D.hablaK = null; cue(0); cortar('general');
   ui.empezar.textContent = 'Empezar la charla'; ui.empezar.classList.remove('activo');
   for (const b of [ui.hablar, ui.receptor, ui.enviar]) b.disabled = true; ui.txt.disabled = true;

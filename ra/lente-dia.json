@@ -1,0 +1,43 @@
+{
+  "proyecto": "Lente DIA · Doña Mirta",
+  "version": 1,
+  "autoria": "IA al Colorado · Auxiliar en IA 2026 · Instructivo 42, Paso 3",
+  "personaje": {
+    "nombre": "Doña Mirta",
+    "descripcion": "Vecina formoseña ficticia, curiosa y exagerada. Personaje ficticio creado con inteligencia artificial.",
+    "agenteElevenLabs": "agent_6601m4h8e93nf5ptap3xaxs29bke",
+    "paginaIndividual": "../index.html",
+    "escenarioConDonRamon": "../vereda/index.html"
+  },
+  "lamina": {
+    "formato": "A4 vertical, 210 x 297 mm",
+    "pixeles": [2480, 3508],
+    "png": "lamina-mirta-A4.png",
+    "pdf": "lamina-mirta-A4.pdf",
+    "marcador": "marcador.jpg",
+    "textos": ["Doña Mirta", "IA al Colorado", "Enfocá con Lente DIA", "Personaje ficticio creado con inteligencia artificial"]
+  },
+  "contenido": {
+    "tipo": "video",
+    "archivo": "video-mirta.mp4",
+    "region": { "x": 0.1081, "y": 0.2588, "ancho": 0.7839, "alto": 0.5542 },
+    "ajuste": "adaptar",
+    "posicion": "50% 50%",
+    "bucle": true,
+    "sonido": "silenciado hasta tocar el botón Activar sonido"
+  },
+  "botones": ["Abrir cámara", "Activar sonido"],
+  "seguimiento": {
+    "motor": "propio (FAST + descriptores binarios + homografía RANSAC), sin librerías externas",
+    "anchoAnalisis": 560,
+    "anchoMarcador": 800,
+    "intervaloMs": 40,
+    "memoriaMs": 450,
+    "minimoInliers": 14
+  },
+  "publicacion": {
+    "repositorio": "beludellamea-cmyk/do-mirta",
+    "carpeta": "ra",
+    "url": "https://beludellamea-cmyk.github.io/do-mirta/ra/"
+  }
+}

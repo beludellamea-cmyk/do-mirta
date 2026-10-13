@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lente DIA · Doña Mirta</title>
+<meta name="description" content="Realidad aumentada de IA al Colorado: enfocá la lámina de Doña Mirta con el celular y mirá su video. Personaje ficticio creado con inteligencia artificial.">
+<meta name="theme-color" content="#2a1a14">
+<style>
+:root{
+  --crema:#f7e7c6; --teja:#b8431f; --verde:#0f6b5c; --mostaza:#e8a82e; --rosa:#d9478a; --oscuro:#2a1a14;
+  --sombra:0 6px 0 var(--oscuro);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--oscuro);color:var(--crema);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden}
+button{font:inherit;cursor:pointer}
+#escena{position:fixed;inset:0;overflow:hidden;background:#150d0a}
+#cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000}
+#analisis{display:none}
+
+/* Capa de realidad aumentada */
+#ar{position:absolute;left:0;top:0;transform-origin:0 0;opacity:0;pointer-events:none;transition:opacity .25s ease;will-change:transform,opacity;
+  background:#000;box-shadow:0 0 0 6px var(--mostaza),0 0 0 10px var(--oscuro),0 12px 40px rgba(0,0,0,.55)}
+#ar.visible{opacity:1}
+#ar video{position:absolute;inset:0;width:100%;height:100%;display:block;background:#000}
+#faltante{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:6%;
+  background:repeating-linear-gradient(45deg,#2a1a14 0 22px,#3a2519 22px 44px);color:var(--crema);font-weight:700;line-height:1.25}
+#faltante b{display:block;color:var(--mostaza);font-size:1.5em;margin-bottom:.4em}
+#faltante code{background:#000a;border-radius:6px;padding:.1em .45em}
+
+/* Cabecera y estado */
+header{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 8px;display:flex;align-items:center;gap:10px;
+  background:linear-gradient(#150d0acc,#150d0a00);z-index:5;pointer-events:none}
+header .marca{background:var(--verde);border:3px solid var(--oscuro);border-radius:30px;padding:3px 14px 5px;font-weight:900;font-size:17px;white-space:nowrap;box-shadow:0 3px 0 var(--oscuro)}
+header .marca b{color:var(--mostaza)}
+header h1{font-size:15px;font-weight:700;opacity:.92}
+#estado{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 96px);z-index:5;text-align:center;pointer-events:none}
+#estado span{display:inline-block;background:#150d0acc;border:2px solid var(--mostaza);border-radius:22px;padding:8px 16px;font-size:15px;font-weight:600;max-width:100%}
+#estado.ok span{border-color:#58d68d}
+#estado.mal span{border-color:#ff7a59}
+
+/* Guía de encuadre */
+#guia{position:absolute;left:50%;top:46%;width:min(70vw,52vh*0.707);aspect-ratio:210/297;transform:translate(-50%,-50%);z-index:3;pointer-events:none;display:none;transition:opacity .25s}
+#guia i{position:absolute;width:34px;height:34px;border:5px solid var(--mostaza)}
+#guia i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:10px}
+#guia i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:10px}
+#guia i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:10px}
+#guia i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:10px}
+#guia.oculta{opacity:0}
+
+/* Botones */
+.barra{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom) + 14px);display:flex;gap:12px;justify-content:center;z-index:6;
+  background:linear-gradient(#150d0a00,#150d0aee 45%)}
+.btn{flex:1;max-width:260px;min-height:56px;border-radius:30px;border:3px solid var(--oscuro);box-shadow:var(--sombra);font-weight:800;font-size:16px;padding:10px 8px;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--oscuro)}
+.btn:focus-visible{outline:4px solid #fff;outline-offset:3px}
+#btnCamara{background:var(--mostaza);color:var(--oscuro)}
+#btnSonido{background:var(--crema);color:var(--oscuro)}
+#btnSonido[aria-pressed="true"]{background:var(--rosa);color:#fff}
+.btn svg{width:21px;height:21px;flex:none}
+
+/* Pantalla de inicio */
+#inicio{position:absolute;inset:0;z-index:4;overflow:auto;padding:calc(env(safe-area-inset-top) + 64px) 18px 120px;background:
+  radial-gradient(circle at 20% 10%,#b8431f55,transparent 45%),radial-gradient(circle at 90% 70%,#0f6b5c66,transparent 50%),var(--oscuro)}
+#inicio .tarjeta{max-width:520px;margin:0 auto;background:var(--crema);color:var(--oscuro);border:4px solid var(--oscuro);border-radius:26px;box-shadow:0 8px 0 #000;padding:20px 20px 22px}
+#inicio h2{font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.05;color:var(--teja);margin-bottom:6px}
+#inicio p{font-size:16px;line-height:1.4;margin:8px 0}
+#inicio ol{margin:10px 0 10px 22px;font-size:16px;line-height:1.5}
+#inicio img{display:block;width:44%;max-width:210px;margin:10px auto;border:4px solid var(--oscuro);border-radius:10px;box-shadow:0 5px 0 var(--oscuro)}
+#inicio .descargas{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+#inicio .descargas a{color:var(--verde);font-weight:800;font-size:15px}
+#inicio small{display:block;margin-top:14px;font-size:13px;opacity:.8;text-align:center}
+#debug{position:absolute;left:8px;top:58px;z-index:9;font:12px/1.3 ui-monospace,monospace;background:#000a;padding:4px 8px;border-radius:6px;display:none;white-space:pre}
+@media (prefers-reduced-motion:reduce){#ar{transition:none}}
+</style>
+</head>
+<body>
+<div id="escena">
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="analisis"></canvas>
+  <div id="guia" class="oculta" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div id="ar" aria-live="off">
+    <video id="video" playsinline webkit-playsinline muted loop preload="auto"></video>
+    <div id="faltante"><div><b>Falta el video de Doña Mirta</b>Copiá tu archivo con este nombre en la misma carpeta:<br><code id="nombreVideo">video-mirta.mp4</code></div></div>
+  </div>
+</div>
+
+<header>
+  <span class="marca">IA al <b>Colorado</b></span>
+  <h1>Lente DIA · Doña Mirta</h1>
+</header>
+
+<section id="inicio">
+  <div class="tarjeta">
+    <h2>Lente DIA</h2>
+    <p><strong>Doña Mirta</strong> aparece en tu celular cuando enfocás su lámina.</p>
+    <img id="miniLamina" alt="Lámina de Doña Mirta para imprimir" src="marcador.jpg">
+    <ol>
+      <li>Imprimí la lámina en A4, mejor a color y en papel mate.</li>
+      <li>Tocá <strong>Abrir cámara</strong> y permití el acceso.</li>
+      <li>Enfocá la lámina completa, con buena luz y sin reflejos.</li>
+      <li>Si el video sale mudo, tocá <strong>Activar sonido</strong>.</li>
+    </ol>
+    <div class="descargas">
+      <a id="lnkPng" href="lamina-mirta-A4.png" download>Lámina PNG</a>
+      <a id="lnkPdf" href="lamina-mirta-A4.pdf" download>Lámina PDF</a>
+    </div>
+    <small>Personaje ficticio creado con inteligencia artificial. Todo el barrio y sus anécdotas son inventados.</small>
+  </div>
+</section>
+
+<div id="estado" role="status" aria-live="polite"><span id="estadoTxt">Preparando la lámina…</span></div>
+<pre id="debug"></pre>
+
+<div class="barra">
+  <button class="btn" id="btnCamara" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.6"/></svg>
+    <span id="txtCamara">Abrir cámara</span>
+  </button>
+  <button class="btn" id="btnSonido" type="button" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="ondas" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+    <span id="txtSonido">Activar sonido</span>
+  </button>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   LENTE DIA · Realidad aumentada con una lámina como marcador
+   - Sin librerías externas: el seguimiento de la imagen está escrito acá
+     (puntos FAST + descriptores binarios tipo ORB + homografía con RANSAC).
+   - La configuración vive en lente-dia.json (lámina, video, región, ajustes).
+   ===================================================================== */
+
+/* ---------- Configuración por defecto (se pisa con lente-dia.json) ---------- */
+const POR_DEFECTO = {
+  lamina: { marcador: 'marcador.jpg', png: 'lamina-mirta-A4.png', pdf: 'lamina-mirta-A4.pdf' },
+  contenido: {
+    archivo: 'video-mirta.mp4',
+    region: { x: 0.1081, y: 0.2588, ancho: 0.7839, alto: 0.5542 },
+    ajuste: 'adaptar', posicion: '50% 50%', bucle: true
+  },
+  seguimiento: { ladoAnalisis: 720, anchoMarcador: 800, intervaloMs: 40, memoriaMs: 450, minimoInliers: 14 }
+};
+const CFG = JSON.parse(JSON.stringify(POR_DEFECTO));
+const $ = (id) => document.getElementById(id);
+const debugOn = /[?&]debug/.test(location.search);
+
+/* =====================================================================
+   1. Seguimiento de imagen
+   ===================================================================== */
+const Seguimiento = (() => {
+  const HALF = 15, NBITS = 256, NANG = 30;
+  const CIRC = [[0,-3],[1,-3],[2,-2],[3,-1],[3,0],[3,1],[2,2],[1,3],[0,3],[-1,3],[-2,2],[-3,1],[-3,0],[-3,-1],[-2,-2],[-1,-3]];
+  // tabla: ¿hay 9 vecinos contiguos en un círculo de 16?
+  const RUN9 = new Uint8Array(65536);
+  for (let m = 0; m < 65536; m++) {
+    const mm = m | (m << 16); let r = mm;
+    for (let k = 1; k < 9; k++) r &= (mm >>> k);
+    RUN9[m] = (r & 0xFFFF) ? 1 : 0;
+  }
+  // generador pseudoaleatorio fijo (mismo patrón siempre)
+  function mulberry(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const PATRONES = (() => {
+    const rnd = mulberry(20260713), base = [];
+    const g = () => { let v = (rnd() + rnd() + rnd() - 1.5) * 2 * 6.2; return Math.max(-12.5, Math.min(12.5, v)); };
+    while (base.length < NBITS) {
+      const p = [g(), g(), g(), g()];
+      if (Math.hypot(p[0] - p[2], p[1] - p[3]) < 4) continue;
+      if (Math.hypot(p[0], p[1]) > 12.8 || Math.hypot(p[2], p[3]) > 12.8) continue;
+      base.push(p);
+    }
+    const tablas = [];
+    for (let a = 0; a < NANG; a++) {
+      const th = a * 2 * Math.PI / NANG, c = Math.cos(th), s = Math.sin(th), t = new Int8Array(NBITS * 4);
+      for (let i = 0; i < NBITS; i++) {
+        const [x1, y1, x2, y2] = base[i];
+        t[i*4]   = Math.round(c * x1 - s * y1); t[i*4+1] = Math.round(s * x1 + c * y1);
+        t[i*4+2] = Math.round(c * x2 - s * y2); t[i*4+3] = Math.round(s * x2 + c * y2);
+      }
+      tablas.push(t);
+    }
+    return tablas;
+  })();
+  const UMAX = []; for (let v = 0; v <= HALF; v++) UMAX.push(Math.floor(Math.sqrt(HALF * HALF - v * v)));
+
+  function aGris(rgba, w, h) {
+    const g = new Uint8Array(w * h);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j+1] * 150 + rgba[j+2] * 29) >> 8;
+    return g;
+  }
+  function suavizar(src, w, h) {
+    const tmp = new Uint8Array(w * h), out = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) { const r = y * w; tmp[r] = src[r]; tmp[r+w-1] = src[r+w-1];
+      for (let x = 1; x < w - 1; x++) tmp[r+x] = (src[r+x-1] + 2 * src[r+x] + src[r+x+1]) >> 2; }
+    out.set(tmp.subarray(0, w)); out.set(tmp.subarray((h-1)*w), (h-1)*w);
+    for (let y = 1; y < h - 1; y++) { const r = y * w; for (let x = 0; x < w; x++) out[r+x] = (tmp[r-w+x] + 2 * tmp[r+x] + tmp[r+w+x]) >> 2; }
+    return out;
+  }
+  const popc = (v) => { v = v - ((v >>> 1) & 0x55555555); v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); return Math.imul((v + (v >>> 4)) & 0x0F0F0F0F, 0x01010101) >>> 24; };
+
+  /* Puntos de interés (FAST-9) + orientación + descriptor de 256 bits */
+  function extraer(gris, w, h, umbral, maxKP) {
+    const gb = suavizar(gris, w, h), M = 18;
+    const o = CIRC.map(([dx, dy]) => dy * w + dx);
+    const score = new Int32Array(w * h), cand = [];
+    for (let y = M; y < h - M; y++) {
+      for (let x = M, i = y * w + M; x < w - M; x++, i++) {
+        const p = gris[i], hi = p + umbral, lo = p - umbral;
+        const a = gris[i+o[0]], b = gris[i+o[4]], c = gris[i+o[8]], d = gris[i+o[12]];
+        const nb = (a > hi) + (b > hi) + (c > hi) + (d > hi), nd = (a < lo) + (b < lo) + (c < lo) + (d < lo);
+        if (nb < 3 && nd < 3) continue;
+        let mb = 0, md = 0, s = 0;
+        for (let k = 0; k < 16; k++) { const v = gris[i+o[k]]; if (v > hi) { mb |= 1 << k; s += v - hi; } else if (v < lo) { md |= 1 << k; s += lo - v; } }
+        if (RUN9[mb] || RUN9[md]) { score[i] = s + 1; cand.push(i); }
+      }
+    }
+    const buenos = [];
+    for (const i of cand) {
+      const s = score[i];
+      if (score[i-1] > s || score[i+1] > s || score[i-w] > s || score[i+w] > s || score[i-w-1] > s || score[i-w+1] > s || score[i+w-1] > s || score[i+w+1] > s) continue;
+      buenos.push(i);
+    }
+    buenos.sort((p, q) => score[q] - score[p]);
+    const celda = 7, cw = Math.ceil(w / celda), ocup = new Uint8Array(cw * Math.ceil(h / celda)), sel = [];
+    for (const i of buenos) {
+      const x = i % w, y = (i - x) / w, c = ((y / celda) | 0) * cw + ((x / celda) | 0);
+      if (ocup[c]) continue; ocup[c] = 1; sel.push(i); if (sel.length >= maxKP) break;
+    }
+    const n = sel.length, X = new Float32Array(n), Y = new Float32Array(n), D = new Int32Array(n * 8);
+    for (let k = 0; k < n; k++) {
+      const x = sel[k] % w, y = (sel[k] - x) / w; X[k] = x; Y[k] = y;
+      let m10 = 0, m01 = 0;
+      for (let v = -HALF; v <= HALF; v++) { const um = UMAX[Math.abs(v)], r = (y + v) * w + x; for (let u = -um; u <= um; u++) { const val = gb[r+u]; m10 += u * val; m01 += v * val; } }
+      let ang = Math.atan2(m01, m10); if (ang < 0) ang += 2 * Math.PI;
+      const bin = Math.round(ang / (2 * Math.PI) * NANG) % NANG, t = PATRONES[bin];
+      for (let wd = 0; wd < 8; wd++) {
+        let bits = 0;
+        for (let b = 0; b < 32; b++) { const q = (wd * 32 + b) * 4; if (gb[(y + t[q+1]) * w + x + t[q]] < gb[(y + t[q+3]) * w + x + t[q+2]]) bits |= (1 << b); }
+        D[k*8 + wd] = bits;
+      }
+    }
+    return { n, X, Y, D };
+  }
+
+  /* Álgebra de homografías */
+  function resolver(A, n) { // A: n x (n+1) en Float64Array
+    for (let c = 0; c < n; c++) {
+      let piv = c, mx = Math.abs(A[c*(n+1)+c]);
+      for (let r = c + 1; r < n; r++) { const v = Math.abs(A[r*(n+1)+c]); if (v > mx) { mx = v; piv = r; } }
+      if (mx < 1e-12) return null;
+      if (piv !== c) for (let k = 0; k <= n; k++) { const t = A[c*(n+1)+k]; A[c*(n+1)+k] = A[piv*(n+1)+k]; A[piv*(n+1)+k] = t; }
+      for (let r = c + 1; r < n; r++) { const f = A[r*(n+1)+c] / A[c*(n+1)+c]; if (f === 0) continue; for (let k = c; k <= n; k++) A[r*(n+1)+k] -= f * A[c*(n+1)+k]; }
+    }
+    const x = new Float64Array(n);
+    for (let r = n - 1; r >= 0; r--) { let s = A[r*(n+1)+n]; for (let k = r + 1; k < n; k++) s -= A[r*(n+1)+k] * x[k]; x[r] = s / A[r*(n+1)+r]; }
+    return x;
+  }
+  function fila(x, y, u, v, out) { // dos filas de la DLT
+    out[0] = [x, y, 1, 0, 0, 0, -u * x, -u * y, u]; out[1] = [0, 0, 0, x, y, 1, -v * x, -v * y, v];
+  }
+  function homografia(src, dst, idx) { // mínimos cuadrados con los índices dados (normal equations)
+    const A = new Float64Array(8 * 9), f = [null, null];
+    for (const i of idx) {
+      fila(src[i*2], src[i*2+1], dst[i*2], dst[i*2+1], f);
+      for (const r of f) for (let a = 0; a < 8; a++) { const ra = r[a]; if (ra === 0) continue; for (let b = 0; b < 9; b++) A[a*9+b] += ra * r[b]; }
+    }
+    for (let a = 0; a < 8; a++) A[a*9+a] += 1e-9;
+    const h = resolver(A, 8); return h ? [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1] : null;
+  }
+  function homografia4(pts, dst) { // pts: [[x,y]x4] -> dst: [[u,v]x4]
+    const A = new Float64Array(8 * 9), f = [null, null];
+    for (let i = 0; i < 4; i++) { fila(pts[i][0], pts[i][1], dst[i][0], dst[i][1], f); for (let b = 0; b < 9; b++) { A[(2*i)*9+b] = f[0][b]; A[(2*i+1)*9+b] = f[1][b]; } }
+    const h = resolver(A, 8); return h ? [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1] : null;
+  }
+  const aplicar = (H, x, y) => { const w = H[6] * x + H[7] * y + 1; return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w]; };
+  function cuadrilateroValido(q, area) {
+    let signo = 0, a = 0;
+    for (let i = 0; i < 4; i++) {
+      const p = q[i], r = q[(i+1)%4], s = q[(i+2)%4];
+      const cz = (r[0] - p[0]) * (s[1] - r[1]) - (r[1] - p[1]) * (s[0] - r[0]);
+      if (cz === 0) return false; const sg = cz > 0 ? 1 : -1; if (signo && sg !== signo) return false; signo = sg;
+      a += p[0] * r[1] - r[0] * p[1];
+    }
+    a = Math.abs(a) / 2; return a > area * 0.02 && a < area * 1.6;
+  }
+
+  class Seguidor {
+    constructor(cfg) { this.cfg = cfg; this.listo = false; this.H = null; this.rand = mulberry(7); }
+    /* Prepara el marcador: pirámide de escalas y descriptores */
+    prepararMarcador(img) {
+      const AW = this.cfg.anchoMarcador, AH = Math.round(AW * img.naturalHeight / img.naturalWidth);
+      this.refW = AW; this.refH = AH;
+      let cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
+      let cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(img, 0, 0, AW, AH);
+      const escalas = [1, 0.84, 0.7071, 0.5946, 0.5, 0.4204, 0.3536, 0.2973, 0.25, 0.21, 0.1768], cupos = [900, 800, 700, 600, 520, 450, 400, 350, 300, 250, 200], todos = [];
+      let prev = cv, total = 0;
+      escalas.forEach((s, li) => {
+        const w = Math.round(AW * s), h = Math.round(AH * s), c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
+        const x2 = c2.getContext('2d', { willReadFrequently: true }); x2.imageSmoothingQuality = 'high'; x2.drawImage(s >= 0.5 ? cv : prev, 0, 0, w, h); prev = c2;
+        const gris = aGris(x2.getImageData(0, 0, w, h).data, w, h);
+        const k = extraer(gris, w, h, 9, cupos[li]); k.s = s; todos.push(k); total += k.n;
+      });
+      this.N = total; this.rX = new Float32Array(total); this.rY = new Float32Array(total); this.rD = new Int32Array(total * 8);
+      let o = 0; for (const k of todos) { for (let i = 0; i < k.n; i++) { this.rX[o+i] = k.X[i] / k.s; this.rY[o+i] = k.Y[i] / k.s; } this.rD.set(k.D, o * 8); o += k.n; }
+      this.listo = true; return total;
+    }
+    /* Devuelve { ok, H (marcador->cámara), inliers, matches } */
+    procesar(rgba, w, h, ahora) {
+      if (!this.listo) return { ok: false, inliers: 0, matches: 0 };
+      const gris = aGris(rgba, w, h);
+      let kp = extraer(gris, w, h, 18, 700);
+      if (kp.n < 150) kp = extraer(gris, w, h, 9, 700);
+      if (kp.n < 25) { this.H = null; return { ok: false, inliers: 0, matches: 0, kp: kp.n }; }
+      let res = null;
+      if (this.H) { const m = this.emparejarGuiado(kp, this.H); res = this.estimar(m, w, h, true); if (!res.ok) { this.H = null; } }
+      if (!this.H) { const m = this.emparejarGlobal(kp); res = this.estimar(m, w, h, false); }
+      if (res.ok) this.H = res.H; else this.H = null;
+      res.kp = kp.n; return res;
+    }
+    emparejarGlobal(kp) {
+      const N = this.N, rD = this.rD, D = kp.D, mejor = new Int32Array(N).fill(1000), idxCam = new Int32Array(N).fill(-1), ratio = new Float32Array(N);
+      for (let i = 0; i < kp.n; i++) {
+        const c0 = D[i*8], c1 = D[i*8+1]; let b = 9999, s = 9999, bj = -1;
+        for (let j = 0; j < N; j++) {
+          const q = j * 8; let d = popc(c0 ^ rD[q]) + popc(c1 ^ rD[q+1]); if (d > 27) continue;
+          d += popc(D[i*8+2] ^ rD[q+2]) + popc(D[i*8+3] ^ rD[q+3]) + popc(D[i*8+4] ^ rD[q+4]);
+          if (d >= s) continue;
+          d += popc(D[i*8+5] ^ rD[q+5]) + popc(D[i*8+6] ^ rD[q+6]) + popc(D[i*8+7] ^ rD[q+7]);
+          if (d < b) { s = b; b = d; bj = j; } else if (d < s) s = d;
+        }
+        if (bj >= 0 && b < 90 && b < 0.85 * s && b < mejor[bj]) { mejor[bj] = b; idxCam[bj] = i; ratio[bj] = b / s; }
+      }
+      return this.recoger(kp, idxCam, ratio);
+    }
+    emparejarGuiado(kp, H) {
+      const N = this.N, rD = this.rD, D = kp.D, celda = 28, gw = 40, gh = 40;
+      const heads = new Int32Array(gw * gh).fill(-1), next = new Int32Array(N).fill(-1), px = new Float32Array(N), py = new Float32Array(N);
+      for (let j = 0; j < N; j++) {
+        const w = H[6] * this.rX[j] + H[7] * this.rY[j] + 1; px[j] = (H[0] * this.rX[j] + H[1] * this.rY[j] + H[2]) / w; py[j] = (H[3] * this.rX[j] + H[4] * this.rY[j] + H[5]) / w;
+        const cx = (px[j] / celda) | 0, cy = (py[j] / celda) | 0; if (cx < 0 || cy < 0 || cx >= gw || cy >= gh) continue;
+        next[j] = heads[cy*gw+cx]; heads[cy*gw+cx] = j;
+      }
+      const mejor = new Int32Array(N).fill(1000), idxCam = new Int32Array(N).fill(-1), ratio = new Float32Array(N), R2 = 30 * 30;
+      for (let i = 0; i < kp.n; i++) {
+        const cx = (kp.X[i] / celda) | 0, cy = (kp.Y[i] / celda) | 0; let b = 9999, s = 9999, bj = -1;
+        for (let gy = cy - 1; gy <= cy + 1; gy++) for (let gx = cx - 1; gx <= cx + 1; gx++) {
+          if (gx < 0 || gy < 0 || gx >= gw || gy >= gh) continue;
+          for (let j = heads[gy*gw+gx]; j >= 0; j = next[j]) {
+            const dx = px[j] - kp.X[i], dy = py[j] - kp.Y[i]; if (dx*dx + dy*dy > R2) continue;
+            let d = 0; for (let k = 0; k < 8; k++) d += popc(D[i*8+k] ^ rD[j*8+k]);
+            if (d < b) { s = b; b = d; bj = j; } else if (d < s) s = d;
+          }
+        }
+        if (bj >= 0 && b < 90 && b < 0.9 * s && b < mejor[bj]) { mejor[bj] = b; idxCam[bj] = i; ratio[bj] = b / s; }
+      }
+      return this.recoger(kp, idxCam, ratio);
+    }
+    recoger(kp, idxCam, ratio) {
+      const ids = []; for (let j = 0; j < this.N; j++) if (idxCam[j] >= 0) ids.push(j);
+      ids.sort((a, b) => ratio[a] - ratio[b]);
+      const n = ids.length, src = new Float64Array(n * 2), dst = new Float64Array(n * 2);
+      ids.forEach((j, k) => { src[k*2] = this.rX[j]; src[k*2+1] = this.rY[j]; dst[k*2] = kp.X[idxCam[j]]; dst[k*2+1] = kp.Y[idxCam[j]]; });
+      return { n, src, dst };
+    }
+    /* RANSAC + refinado */
+    estimar(m, w, h, guiado) {
+      const n = m.n, minIn = this.cfg.minimoInliers;
+      if (n < Math.max(8, minIn * 0.6)) return { ok: false, inliers: 0, matches: n };
+      const sc = 1 / this.refW, sk = 1 / w, S = new Float64Array(n * 2), T = new Float64Array(n * 2);
+      for (let i = 0; i < n * 2; i++) { S[i] = m.src[i] * sc; T[i] = m.dst[i] * sk; }
+      const umbral = 4.5 * sk, u2 = umbral * umbral, area = w * h, iters = guiado ? 120 : 450;
+      const refQuad = [[0, 0], [this.refW, 0], [this.refW, this.refH], [0, this.refH]];
+      let mejorN = 0, mejorH = null;
+      const idx4 = [0, 0, 0, 0];
+      const contar = (Hn) => { let c = 0; for (let i = 0; i < n; i++) { const x = S[i*2], y = S[i*2+1], ww = Hn[6]*x + Hn[7]*y + 1, dx = (Hn[0]*x + Hn[1]*y + Hn[2]) / ww - T[i*2], dy = (Hn[3]*x + Hn[4]*y + Hn[5]) / ww - T[i*2+1]; if (dx*dx + dy*dy < u2) c++; } return c; };
+      for (let it = 0; it < iters; it++) {
+        const lim = Math.min(n, 12 + it);
+        for (let k = 0; k < 4; k++) { let r, ok; do { r = (this.rand() * lim) | 0; ok = true; for (let q = 0; q < k; q++) if (idx4[q] === r) ok = false; } while (!ok); idx4[k] = r; }
+        const P = idx4.map(i => [S[i*2], S[i*2+1]]), Q = idx4.map(i => [T[i*2], T[i*2+1]]);
+        let degenerado = false;
+        for (let a = 0; a < 4 && !degenerado; a++) { const b = (a+1)%4, c = (a+2)%4; if (Math.abs((P[b][0]-P[a][0])*(P[c][1]-P[a][1]) - (P[b][1]-P[a][1])*(P[c][0]-P[a][0])) < 2e-3 || Math.abs((Q[b][0]-Q[a][0])*(Q[c][1]-Q[a][1]) - (Q[b][1]-Q[a][1])*(Q[c][0]-Q[a][0])) < 2e-4) degenerado = true; }
+        if (degenerado) continue;
+        const Hn = homografia4(P, Q); if (!Hn) continue;
+        const c = contar(Hn); if (c > mejorN) { mejorN = c; mejorH = Hn; if (c > n * 0.7) break; }
+      }
+      if (!mejorH || mejorN < Math.min(minIn, 10)) return { ok: false, inliers: mejorN, matches: n };
+      // refinado con todos los inliers
+      for (let r = 0; r < 3; r++) {
+        const ins = []; for (let i = 0; i < n; i++) { const x = S[i*2], y = S[i*2+1], ww = mejorH[6]*x + mejorH[7]*y + 1, dx = (mejorH[0]*x + mejorH[1]*y + mejorH[2]) / ww - T[i*2], dy = (mejorH[3]*x + mejorH[4]*y + mejorH[5]) / ww - T[i*2+1]; if (dx*dx + dy*dy < u2) ins.push(i); }
+        if (ins.length < 8) break; const Hn = homografia(S, T, ins); if (!Hn) break; mejorH = Hn; mejorN = ins.length;
+      }
+      // pasar de coordenadas normalizadas a píxeles: cam = Hn(ref/refW) * w
+      const Hn = mejorH, f = w, g = sc;
+      const H = [Hn[0] * f * g, Hn[1] * f * g, Hn[2] * f, Hn[3] * f * g, Hn[4] * f * g, Hn[5] * f, Hn[6] * g, Hn[7] * g, 1];
+      const quad = refQuad.map(p => aplicar(H, p[0], p[1]));
+      const minimo = guiado ? Math.min(minIn, 12) : minIn;
+      if (mejorN < minimo || !cuadrilateroValido(quad, area)) return { ok: false, inliers: mejorN, matches: n };
+      return { ok: true, H, inliers: mejorN, matches: n, quad };
+    }
+  }
+  return { Seguidor, homografia4, aplicar };
+})();
+
+/* =====================================================================
+   2. Aplicación: cámara, video superpuesto, botones
+   ===================================================================== */
+const el = { cam: $('cam'), analisis: $('analisis'), ar: $('ar'), video: $('video'), faltante: $('faltante'), guia: $('guia'),
+  inicio: $('inicio'), estado: $('estado'), estadoTxt: $('estadoTxt'), btnCamara: $('btnCamara'), txtCamara: $('txtCamara'),
+  btnSonido: $('btnSonido'), txtSonido: $('txtSonido'), ondas: $('ondas'), debug: $('debug'), escena: $('escena') };
+const seguidor = { s: null }, est = { camara: false, marcadorListo: false, visto: 0, visible: false, quad: null, suave: null, ultimoProc: 0, videoOk: true, fps: 0, ultimoEstado: '' };
+let stream = null, ctxA = null;
+
+function mensaje(txt, tipo) { if (txt === est.ultimoEstado) return; est.ultimoEstado = txt; el.estadoTxt.textContent = txt; el.estado.className = tipo || ''; }
+const cargarImagen = (url) => new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error('No se pudo cargar ' + url)); i.src = url; });
+function mezclar(base, extra) { for (const k in extra) { if (extra[k] && typeof extra[k] === 'object' && !Array.isArray(extra[k])) { base[k] = base[k] || {}; mezclar(base[k], extra[k]); } else base[k] = extra[k]; } return base; }
+
+/* Recuadro del video dentro de la región de la lámina. Con ajuste «adaptar» toma la proporción del video
+   (horizontal, vertical o cuadrado) y queda centrado; con «cover» o «contain» llena toda la región. */
+function ajustarRecuadro() {
+  if (!est.regW) return;
+  let x = est.regX, y = est.regY, w = est.regW, h = est.regH;
+  if ((CFG.contenido.ajuste || 'adaptar') === 'adaptar' && est.aspecto > 0) {
+    h = w / est.aspecto; if (h > est.regH) { h = est.regH; w = h * est.aspecto; }
+    x = est.regX + (est.regW - w) / 2; y = est.regY + (est.regH - h) / 2;
+  }
+  est.ovX = x; est.ovY = y; est.ovW = w; est.ovH = h;
+  el.ar.style.width = w + 'px'; el.ar.style.height = h + 'px';
+  el.video.style.objectFit = (CFG.contenido.ajuste === 'contain') ? 'contain' : 'cover';
+}
+async function iniciar() {
+  try { const r = await fetch('lente-dia.json', { cache: 'no-cache' }); if (r.ok) mezclar(CFG, await r.json()); } catch (e) { /* sin json: usa valores por defecto */ }
+  const cont = CFG.contenido, lam = CFG.lamina;
+  $('lnkPng').href = lam.png; $('lnkPdf').href = lam.pdf; $('miniLamina').src = lam.marcador; $('nombreVideo').textContent = cont.archivo;
+  // tamaño del recuadro de video = región de la lámina en píxeles del marcador
+  el.video.loop = cont.bucle !== false; el.video.style.objectPosition = cont.posicion || '50% 50%';
+  el.video.addEventListener('error', () => { est.videoOk = false; est.aspecto = 0; el.faltante.style.display = 'flex'; el.video.style.display = 'none'; ajustarRecuadro(); });
+  el.video.addEventListener('loadedmetadata', () => { est.aspecto = el.video.videoWidth / el.video.videoHeight || 0; ajustarRecuadro(); });
+  el.video.addEventListener('loadeddata', () => { est.videoOk = true; el.faltante.style.display = 'none'; el.video.style.display = 'block'; });
+  el.video.src = cont.archivo; el.video.load();
+  try {
+    const img = await cargarImagen(lam.marcador);
+    seguidor.s = new Seguimiento.Seguidor(CFG.seguimiento);
+    await new Promise(r => setTimeout(r, 30));
+    const t0 = performance.now(), n = seguidor.s.prepararMarcador(img);
+    const reg = cont.region, S = seguidor.s;
+    est.regW = reg.ancho * S.refW; est.regH = reg.alto * S.refH; est.regX = reg.x * S.refW; est.regY = reg.y * S.refH;
+    ajustarRecuadro();
+    est.marcadorListo = true; est.puntos = n; est.tPrep = Math.round(performance.now() - t0);
+    mensaje('Tocá «Abrir cámara» y enfocá la lámina.');
+  } catch (e) { mensaje('Error: ' + e.message, 'mal'); }
+  if (debugOn) el.debug.style.display = 'block';
+}
+
+async function abrirCamara() {
+  if (est.camara) return cerrarCamara();
+  if (!est.marcadorListo) { mensaje('Todavía estoy preparando la lámina. Probá de nuevo en un instante.'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { mensaje('Error: este navegador no permite abrir la cámara. Probá con Chrome o Safari actualizados.', 'mal'); return; }
+  if (!window.isSecureContext) { mensaje('Error: la cámara solo funciona si la página está en https.', 'mal'); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+  } catch (e) {
+    const t = { NotAllowedError: 'Error: no diste permiso a la cámara. Habilitala en el candado de la barra de direcciones y probá de nuevo.', NotFoundError: 'Error: no encontré una cámara en este dispositivo.', NotReadableError: 'Error: otra aplicación está usando la cámara. Cerrala y probá de nuevo.' }[e.name];
+    mensaje(t || ('Error: ' + e.name + ' ' + e.message), 'mal'); return;
+  }
+  el.cam.srcObject = stream; el.cam.style.display = 'block';
+  try { await el.cam.play(); } catch (e) { /* se reintenta con los metadatos */ }
+  el.video.play().then(() => { if (!est.visible) el.video.pause(); }).catch(() => {}); // “desbloquea” el video con el toque
+  el.inicio.style.display = 'none'; el.guia.style.display = 'block'; el.guia.classList.remove('oculta');
+  est.camara = true; el.txtCamara.textContent = 'Cerrar cámara'; est.visto = 0; seguidor.s.H = null;
+  mensaje('Buscando la lámina… Enfocala completa, con buena luz.');
+  requestAnimationFrame(bucle);
+}
+function cerrarCamara() {
+  est.camara = false; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null;
+  el.cam.srcObject = null; el.cam.style.display = 'none'; ocultarAR(); el.guia.style.display = 'none'; el.inicio.style.display = 'block';
+  el.txtCamara.textContent = 'Abrir cámara'; mensaje('Tocá «Abrir cámara» y enfocá la lámina.');
+}
+function alternarSonido() {
+  const quiere = el.video.muted; // si está silenciado, se activa
+  el.video.muted = !quiere; el.btnSonido.setAttribute('aria-pressed', String(quiere)); el.txtSonido.textContent = quiere ? 'Silenciar' : 'Activar sonido';
+  el.ondas.style.display = quiere ? '' : 'none';
+  el.video.play().then(() => { if (!est.visible && est.camara) el.video.pause(); }).catch(() => {
+    if (quiere && est.videoOk) { el.video.muted = true; el.btnSonido.setAttribute('aria-pressed', 'false'); el.txtSonido.textContent = 'Activar sonido'; mensaje('Tu navegador no dejó activar el sonido. Subí el volumen del celular y probá de nuevo.', 'mal'); }
+  });
+}
+
+function matriz3d(H) { return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,1)`; }
+function mostrarAR(quadCam, vw, vh, aw) {
+  // cámara (píxeles de análisis) -> pantalla (object-fit: cover)
+  const sw = el.escena.clientWidth, sh = el.escena.clientHeight, esc = Math.max(sw / vw, sh / vh), f = vw / aw;
+  const ox = (sw - vw * esc) / 2, oy = (sh - vh * esc) / 2, S = Seguimiento;
+  const dstPant = quadCam.map(p => [ox + p[0] * f * esc, oy + p[1] * f * esc]);
+  const H2 = S.homografia4([[0, 0], [est.ovW, 0], [est.ovW, est.ovH], [0, est.ovH]], dstPant);
+  if (!H2) return;
+  el.ar.style.transform = matriz3d(H2);
+}
+function ocultarAR() { el.ar.classList.remove('visible'); if (est.visible) { est.visible = false; el.video.pause(); } }
+
+function actualizar(res, vw, vh, aw, ahora) {
+  const S = Seguimiento, seg = seguidor.s;
+  if (res.ok) {
+    const q = [[est.ovX, est.ovY], [est.ovX + est.ovW, est.ovY], [est.ovX + est.ovW, est.ovY + est.ovH], [est.ovX, est.ovY + est.ovH]].map(p => S.aplicar(res.H, p[0], p[1]));
+    if (!est.suave) est.suave = q.map(p => p.slice());
+    else { let mov = 0; q.forEach((p, i) => { mov = Math.max(mov, Math.hypot(p[0] - est.suave[i][0], p[1] - est.suave[i][1])); });
+      const a = mov > 40 ? 1 : 0.55; q.forEach((p, i) => { est.suave[i][0] += (p[0] - est.suave[i][0]) * a; est.suave[i][1] += (p[1] - est.suave[i][1]) * a; }); }
+    est.visto = ahora; mostrarAR(est.suave, vw, vh, aw);
+    if (!est.visible) {
+      est.visible = true; el.ar.classList.add('visible'); el.guia.classList.add('oculta');
+      if (ahora - (est.perdido || 0) > 4000) { try { el.video.currentTime = 0; } catch (e) {} }
+      const p = el.video.play(); if (p && p.catch) p.catch(() => { el.video.muted = true; el.video.play().catch(() => {}); });
+    }
+    mensaje(est.videoOk ? '¡Apareció Doña Mirta! Si no se escucha, tocá «Activar sonido».' : 'Lámina reconocida. Falta agregar el video de Doña Mirta.', 'ok');
+  } else if (est.visible && ahora - est.visto > CFG.seguimiento.memoriaMs) {
+    est.perdido = ahora; est.suave = null; ocultarAR(); el.guia.classList.remove('oculta'); mensaje('Buscando la lámina… Enfocala completa, con buena luz.');
+  }
+}
+function tamanoAnalisis(vw, vh) { const k = CFG.seguimiento.ladoAnalisis / Math.max(vw, vh); return { aw: Math.round(vw * k), ah: Math.round(vh * k) }; }
+function bucle(t) {
+  if (!est.camara) return; requestAnimationFrame(bucle);
+  const v = el.cam; if (v.readyState < 2 || !v.videoWidth || t - est.ultimoProc < CFG.seguimiento.intervaloMs) return;
+  const dt = t - est.ultimoProc; est.ultimoProc = t; est.fps = est.fps * 0.8 + (1000 / dt) * 0.2;
+  const { aw, ah } = tamanoAnalisis(v.videoWidth, v.videoHeight);
+  if (el.analisis.width !== aw || el.analisis.height !== ah) { el.analisis.width = aw; el.analisis.height = ah; ctxA = el.analisis.getContext('2d', { willReadFrequently: true }); }
+  ctxA.drawImage(v, 0, 0, aw, ah);
+  const id = ctxA.getImageData(0, 0, aw, ah), t0 = performance.now();
+  const res = seguidor.s.procesar(id.data, aw, ah, t);
+  actualizar(res, v.videoWidth, v.videoHeight, aw, t);
+  if (debugOn) el.debug.textContent = `fps ${est.fps.toFixed(1)}  proc ${(performance.now() - t0).toFixed(0)} ms\npuntos cam ${res.kp}  matches ${res.matches}  inliers ${res.inliers}  ${res.ok ? 'OK' : '--'}\nmarcador: ${est.puntos} pts (${est.tPrep} ms)`;
+}
+
+el.btnCamara.addEventListener('click', abrirCamara);
+el.btnSonido.addEventListener('click', alternarSonido);
+document.addEventListener('visibilitychange', () => { if (document.hidden) el.video.pause(); });
+window.LenteDIA = { Seguimiento, CFG, est, seguidor, iniciar, cargarImagen, tamanoAnalisis };
+iniciar();
+</script>
+</body>
+</html>

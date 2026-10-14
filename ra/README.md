@@ -12,16 +12,16 @@ Realidad aumentada con una lámina impresa: al enfocarla con el celular, aparece
 | `lamina-mirta-A4.png` | Lámina para imprimir (A4, 2480 × 3508 px, 300 ppp). |
 | `lamina-mirta-A4.pdf` | La misma lámina en PDF A4. |
 | `marcador.jpg` | La misma lámina en menor tamaño: es lo que la página usa para reconocerla. |
-| `video-mirta.mp4` | **Falta agregarlo** (ver abajo). |
+| `video-mirta.mp4` | Video de Doña Mirta hablando (MP4 H.264 + AAC, 38,7 s, con su audio original). |
 
-## Cómo incorporar el video de Doña Mirta
+## El video
 
-1. Dejá tu video con el nombre exacto **`video-mirta.mp4`** en esta misma carpeta (`ra`), junto a `index.html`.
-   - En GitHub: carpeta `ra` → Add file → Upload files → arrastrá el video → Commit changes.
-   - Si querés otro nombre, cambialo en `lente-dia.json` (`contenido.archivo`).
-2. Formato recomendado: MP4 con video H.264 y audio AAC, de hasta 20 MB (GitHub no deja subir archivos de más de 25 MB desde el navegador).
-3. Sirve horizontal, vertical o cuadrado. Con `"ajuste": "adaptar"` (lo normal) el video conserva su proporción y queda centrado en la ventana de la lámina. Otras opciones: `"cover"` llena toda la ventana recortando los bordes y `"contain"` la llena sin recortar.
-4. Hasta que subas el video, al enfocar la lámina aparece un cartel que dice «Falta el video de Doña Mirta»: así sabés que el reconocimiento ya funciona.
+`video-mirta.mp4` ya está en esta carpeta y se conecta en `lente-dia.json` (`contenido.archivo`). Para cambiarlo, reemplazá el archivo (o el nombre en el JSON).
+
+- Formato: MP4 con video H.264 y audio AAC. Evitá HEVC/H.265 (el formato por defecto de algunos celulares): muchos navegadores no lo reproducen.
+- Con `"ajuste": "adaptar"` (lo normal) el video conserva su proporción y queda centrado sobre la ilustración de la lámina. Otras opciones: `"cover"` llena toda la ventana recortando los bordes y `"contain"` la llena sin recortar.
+- El sonido empieza apagado porque los navegadores no permiten reproducir con sonido sin un toque. Tocá **Activar sonido** (o **Reproducir video**) para escuchar a Doña Mirta con su voz original.
+- Si el navegador bloquea la reproducción (por ejemplo, un iPhone con ahorro de batería), aparece el botón **Reproducir video**.
 
 ## Cómo probarlo
 
@@ -29,7 +29,7 @@ Realidad aumentada con una lámina impresa: al enfocarla con el celular, aparece
 2. Abrí la página en el celular (tiene que estar en **https**, por ejemplo GitHub Pages).
 3. Tocá **Abrir cámara** y permití el acceso.
 4. Enfocá la lámina completa, con buena luz y sin reflejos. Mantenela a unos 25–40 cm.
-5. Cuando la reconoce, el video aparece sobre la imagen de Doña Mirta. Si sale mudo, tocá **Activar sonido**.
+5. Cuando la reconoce, el video aparece sobre la imagen de Doña Mirta. Si sale mudo, tocá **Activar sonido**. Si no arranca, tocá **Reproducir video**.
 6. Para grabar una demostración, usá otro dispositivo y filmá el celular enfocando la lámina.
 
 Para ver datos técnicos (cuadros por segundo, puntos reconocidos), agregá `?debug` al final de la dirección.
@@ -48,8 +48,9 @@ El reconocimiento está escrito en el propio `index.html`: detecta puntos de int
 |---|---|
 | La cámara no abre | La página tiene que estar en https. Revisá el permiso de cámara en el candado de la barra de direcciones. |
 | No reconoce la lámina | Más luz, sin reflejos, la lámina entera en pantalla y bien plana. Probá con papel mate. |
-| El video sale mudo | Tocá **Activar sonido** y subí el volumen del celular. |
-| Aparece «Falta el video» | Subí `video-mirta.mp4` a esta carpeta. |
+| El video sale mudo | Tocá **Activar sonido** y subí el volumen del celular (y fijate que el celular no esté en silencio). |
+| El video no arranca | Tocá **Reproducir video**. |
+| Aparece «Falta el video» o «no pudo reproducir» | Revisá que `video-mirta.mp4` esté en esta carpeta y sea H.264. |
 | Aparece un cartel «Error: …» | Copiá el texto exacto y pasalo junto con el modelo de celular y el navegador. |
 
 ## Qué se comprobó y qué no

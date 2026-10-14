@@ -1,6 +1,6 @@
 {
   "proyecto": "Lente DIA · Doña Mirta",
-  "version": 1,
+  "version": 2,
   "autoria": "IA al Colorado · Auxiliar en IA 2026 · Instructivo 42, Paso 3",
   "personaje": {
     "nombre": "Doña Mirta",
@@ -11,22 +11,40 @@
   },
   "lamina": {
     "formato": "A4 vertical, 210 x 297 mm",
-    "pixeles": [2480, 3508],
+    "pixeles": [
+      2480,
+      3508
+    ],
     "png": "lamina-mirta-A4.png",
     "pdf": "lamina-mirta-A4.pdf",
     "marcador": "marcador.jpg",
-    "textos": ["Doña Mirta", "IA al Colorado", "Enfocá con Lente DIA", "Personaje ficticio creado con inteligencia artificial"]
+    "textos": [
+      "Doña Mirta",
+      "IA al Colorado",
+      "Enfocá con Lente DIA",
+      "Personaje ficticio creado con inteligencia artificial"
+    ]
   },
   "contenido": {
     "tipo": "video",
     "archivo": "video-mirta.mp4",
-    "region": { "x": 0.1081, "y": 0.2588, "ancho": 0.7839, "alto": 0.5542 },
+    "region": {
+      "x": 0.1081,
+      "y": 0.2588,
+      "ancho": 0.7839,
+      "alto": 0.5542
+    },
     "ajuste": "adaptar",
     "posicion": "50% 50%",
     "bucle": true,
-    "sonido": "silenciado hasta tocar el botón Activar sonido"
+    "sonido": "Arranca sin sonido (los navegadores lo exigen) hasta tocar «Activar sonido» o «Reproducir video»",
+    "formato": "MP4 H.264 + AAC, 1280 x 604, 38,7 s, con su audio original",
+    "reproduccionBloqueada": "si el navegador no deja reproducir, aparece el botón «Reproducir video»"
   },
-  "botones": ["Abrir cámara", "Activar sonido"],
+  "botones": [
+    "Abrir cámara",
+    "Activar sonido"
+  ],
   "seguimiento": {
     "motor": "propio (FAST + descriptores binarios + homografía RANSAC), sin librerías externas",
     "anchoAnalisis": 560,

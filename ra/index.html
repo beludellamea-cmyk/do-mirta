@@ -57,6 +57,10 @@ header h1{font-size:15px;font-weight:700;opacity:.92}
 #btnCamara{background:var(--mostaza);color:var(--oscuro)}
 #btnSonido{background:var(--crema);color:var(--oscuro)}
 #btnSonido[aria-pressed="true"]{background:var(--rosa);color:#fff}
+#btnPlay{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:7;max-width:none;flex:none;padding:14px 26px;min-height:64px;font-size:19px;background:var(--rosa);color:#fff;box-shadow:0 6px 0 var(--oscuro),0 0 0 6px #fff8}
+#btnPlay[hidden]{display:none}
+#btnPlay:active{transform:translate(-50%,calc(-50% + 4px))}
+#btnPlay svg{width:26px;height:26px}
 .btn svg{width:21px;height:21px;flex:none}
 
 /* Pantalla de inicio */
@@ -80,8 +84,8 @@ header h1{font-size:15px;font-weight:700;opacity:.92}
   <canvas id="analisis"></canvas>
   <div id="guia" class="oculta" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div id="ar" aria-live="off">
-    <video id="video" playsinline webkit-playsinline muted loop preload="auto"></video>
-    <div id="faltante"><div><b>Falta el video de Doña Mirta</b>Copiá tu archivo con este nombre en la misma carpeta:<br><code id="nombreVideo">video-mirta.mp4</code></div></div>
+    <video id="video" playsinline webkit-playsinline muted loop preload="metadata"></video>
+    <div id="faltante"><div><b id="faltanteTitulo">Falta el video de Doña Mirta</b><span id="faltanteTxt">Copiá tu archivo con este nombre en la misma carpeta:<br><code id="nombreVideo">video-mirta.mp4</code></span></div></div>
   </div>
 </div>
 
@@ -109,6 +113,10 @@ header h1{font-size:15px;font-weight:700;opacity:.92}
   </div>
 </section>
 
+<button class="btn" id="btnPlay" type="button" hidden>
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
+  <span>Reproducir video</span>
+</button>
 <div id="estado" role="status" aria-live="polite"><span id="estadoTxt">Preparando la lámina…</span></div>
 <pre id="debug"></pre>
 
@@ -407,7 +415,7 @@ const Seguimiento = (() => {
    ===================================================================== */
 const el = { cam: $('cam'), analisis: $('analisis'), ar: $('ar'), video: $('video'), faltante: $('faltante'), guia: $('guia'),
   inicio: $('inicio'), estado: $('estado'), estadoTxt: $('estadoTxt'), btnCamara: $('btnCamara'), txtCamara: $('txtCamara'),
-  btnSonido: $('btnSonido'), txtSonido: $('txtSonido'), ondas: $('ondas'), debug: $('debug'), escena: $('escena') };
+  btnSonido: $('btnSonido'), btnPlay: $('btnPlay'), faltanteTitulo: $('faltanteTitulo'), faltanteTxt: $('faltanteTxt'), txtSonido: $('txtSonido'), ondas: $('ondas'), debug: $('debug'), escena: $('escena') };
 const seguidor = { s: null }, est = { camara: false, marcadorListo: false, visto: 0, visible: false, quad: null, suave: null, ultimoProc: 0, videoOk: true, fps: 0, ultimoEstado: '' };
 let stream = null, ctxA = null;
 
@@ -434,7 +442,13 @@ async function iniciar() {
   $('lnkPng').href = lam.png; $('lnkPdf').href = lam.pdf; $('miniLamina').src = lam.marcador; $('nombreVideo').textContent = cont.archivo;
   // tamaño del recuadro de video = región de la lámina en píxeles del marcador
   el.video.loop = cont.bucle !== false; el.video.style.objectPosition = cont.posicion || '50% 50%';
-  el.video.addEventListener('error', () => { est.videoOk = false; est.aspecto = 0; el.faltante.style.display = 'flex'; el.video.style.display = 'none'; ajustarRecuadro(); });
+  el.video.addEventListener('error', async () => {
+    est.videoOk = false; est.aspecto = 0; el.video.style.display = 'none'; ocultarPlay();
+    let existe = false; try { const r = await fetch(el.video.currentSrc || el.video.src, { method: 'HEAD', cache: 'no-cache' }); existe = r.ok; } catch (e) { /* sin red */ }
+    if (existe) { el.faltanteTitulo.textContent = 'Este navegador no pudo reproducir el video'; el.faltanteTxt.textContent = 'Probá con Chrome o Safari actualizados.'; }
+    el.faltante.style.display = 'flex'; ajustarRecuadro();
+  });
+  el.video.addEventListener('playing', ocultarPlay);
   el.video.addEventListener('loadedmetadata', () => { est.aspecto = el.video.videoWidth / el.video.videoHeight || 0; ajustarRecuadro(); });
   el.video.addEventListener('loadeddata', () => { est.videoOk = true; el.faltante.style.display = 'none'; el.video.style.display = 'block'; });
   el.video.src = cont.archivo; el.video.load();
@@ -463,7 +477,7 @@ async function abrirCamara() {
     const t = { NotAllowedError: 'Error: no diste permiso a la cámara. Habilitala en el candado de la barra de direcciones y probá de nuevo.', NotFoundError: 'Error: no encontré una cámara en este dispositivo.', NotReadableError: 'Error: otra aplicación está usando la cámara. Cerrala y probá de nuevo.' }[e.name];
     mensaje(t || ('Error: ' + e.name + ' ' + e.message), 'mal'); return;
   }
-  el.cam.srcObject = stream; el.cam.style.display = 'block';
+  el.video.preload = 'auto'; el.cam.srcObject = stream; el.cam.style.display = 'block';
   try { await el.cam.play(); } catch (e) { /* se reintenta con los metadatos */ }
   el.video.play().then(() => { if (!est.visible) el.video.pause(); }).catch(() => {}); // “desbloquea” el video con el toque
   el.inicio.style.display = 'none'; el.guia.style.display = 'block'; el.guia.classList.remove('oculta');
@@ -485,6 +499,28 @@ function alternarSonido() {
   });
 }
 
+/* Reproducción: primero con el sonido que el usuario eligió; si el navegador la bloquea, sin sonido; y si aun así
+   la bloquea (por ejemplo, iPhone con ahorro de batería), aparece el botón «Reproducir video». */
+function sincronizarSonido() {
+  const conSonido = !el.video.muted;
+  el.btnSonido.setAttribute('aria-pressed', String(conSonido)); el.txtSonido.textContent = conSonido ? 'Silenciar' : 'Activar sonido'; el.ondas.style.display = conSonido ? '' : 'none';
+}
+function mostrarPlay() { if (est.videoOk && est.camara) el.btnPlay.hidden = false; }
+function ocultarPlay() { el.btnPlay.hidden = true; }
+function reproducir() {
+  if (!est.videoOk && !el.video.currentSrc) return;
+  const ok = () => { clearTimeout(est.chequeo); est.chequeo = setTimeout(() => { if (est.visible && el.video.paused && est.videoOk) mostrarPlay(); }, 900); };
+  const p = el.video.play();
+  if (!p || !p.catch) { ok(); return; }
+  p.then(ok).catch(() => {
+    if (!el.video.muted) { el.video.muted = true; sincronizarSonido(); return el.video.play().then(ok); }
+    throw new Error('bloqueado');
+  }).catch(() => mostrarPlay());
+}
+el.btnPlay.addEventListener('click', () => {
+  el.video.muted = false; sincronizarSonido(); // el toque habilita el sonido
+  el.video.play().then(ocultarPlay).catch(() => { el.video.muted = true; sincronizarSonido(); el.video.play().then(ocultarPlay).catch(() => mensaje('Error: tu navegador no deja reproducir el video. Probá con Chrome o Safari actualizados.', 'mal')); });
+});
 function matriz3d(H) { return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,1)`; }
 function mostrarAR(quadCam, vw, vh, aw) {
   // cámara (píxeles de análisis) -> pantalla (object-fit: cover)
@@ -495,7 +531,7 @@ function mostrarAR(quadCam, vw, vh, aw) {
   if (!H2) return;
   el.ar.style.transform = matriz3d(H2);
 }
-function ocultarAR() { el.ar.classList.remove('visible'); if (est.visible) { est.visible = false; el.video.pause(); } }
+function ocultarAR() { ocultarPlay(); el.ar.classList.remove('visible'); if (est.visible) { est.visible = false; el.video.pause(); } }
 
 function actualizar(res, vw, vh, aw, ahora) {
   const S = Seguimiento, seg = seguidor.s;
@@ -508,9 +544,11 @@ function actualizar(res, vw, vh, aw, ahora) {
     if (!est.visible) {
       est.visible = true; el.ar.classList.add('visible'); el.guia.classList.add('oculta');
       if (ahora - (est.perdido || 0) > 4000) { try { el.video.currentTime = 0; } catch (e) {} }
-      const p = el.video.play(); if (p && p.catch) p.catch(() => { el.video.muted = true; el.video.play().catch(() => {}); });
+      reproducir();
     }
-    mensaje(est.videoOk ? '¡Apareció Doña Mirta! Si no se escucha, tocá «Activar sonido».' : 'Lámina reconocida. Falta agregar el video de Doña Mirta.', 'ok');
+    mensaje(!est.videoOk ? (el.faltanteTitulo.textContent.startsWith('Este navegador') ? 'Lámina reconocida, pero este navegador no pudo reproducir el video.' : 'Lámina reconocida. Falta agregar el video de Doña Mirta.')
+      : !el.btnPlay.hidden ? 'Tocá «Reproducir video» para ver a Doña Mirta.'
+      : el.video.muted ? '¡Apareció Doña Mirta! Si no se escucha, tocá «Activar sonido».' : '¡Apareció Doña Mirta!', 'ok');
   } else if (est.visible && ahora - est.visto > CFG.seguimiento.memoriaMs) {
     est.perdido = ahora; est.suave = null; ocultarAR(); el.guia.classList.remove('oculta'); mensaje('Buscando la lámina… Enfocala completa, con buena luz.');
   }

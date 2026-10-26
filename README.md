@@ -30,3 +30,15 @@ Humano digital de una vecina formoseña **ficticia** que conversa desde la venta
 ## Consideraciones éticas
 
 Doña Mirta es una recreación humorística y la página lo dice. Solo chismea de vecinos inventados, nunca de personas reales. Admite ser una IA si se lo preguntan, no pide datos personales y deriva con cariño a un adulto de confianza si alguien cuenta que está mal. La voz de quien habla viaja a ElevenLabs; quien prefiera puede escribirle en lugar de hablar.
+
+## Lente DIA: Doña Mirta en realidad aumentada
+
+- **Abrir el lente:** https://beludellamea-cmyk.github.io/do-mirta/ra/
+- Imprimí la lámina desde el propio lente y permití la cámara.
+- Al reconocer la lámina, el lente muestra **el mismo avatar 3D interactivo** de la página principal (no un MP4).
+- Tocá **Hablar** para iniciar la conversación con el agente existente de ElevenLabs. Podés terminarla o abrir **Escribir** para mandar mensajes durante la charla.
+- La versión 3D que muestra el lente se carga desde \`../index.html?modo=lente\` y utiliza mensajería entre marcos del mismo origen para sincronizar voz, estados y transcripciones.
+- **Alternativa:** si el navegador no admite cámara + micrófono al mismo tiempo, o falla WebGL, usá el enlace **Conversar sin lente** y abrí la experiencia interactiva a pantalla completa.
+- El navegador debe permitir acceso a cámara y micrófono sobre HTTPS; cada minuto conectado puede consumir créditos de ElevenLabs.
+
+La configuración del lente vive en \`ra/lente-dia.json\`. La lámina y su marcador existente se mantienen sin cambios. El motor de seguimiento visual y el avatar 3D consumen recursos: se recomienda un celular moderno y buena iluminación.

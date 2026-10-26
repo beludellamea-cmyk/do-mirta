@@ -98,6 +98,10 @@
     .cargando{left:14px;top:14px;bottom:auto}
   }
   @media (prefers-reduced-motion:reduce){ .almanaque{transform:none} }
+  /* Modo de realidad aumentada: figura visible, sin controles duplicados. */
+  html.en-lente .almanaque,html.en-lente .vineta,html.en-lente .grano{display:none}
+  html.en-lente .cargando{font-size:13px;left:10px;top:10px;bottom:auto}
+  html.en-lente #escena{touch-action:none;pointer-events:none}
 </style>
 </head>
 <body>
@@ -135,6 +139,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
    Configuración
    ============================================================ */
 const params = new URLSearchParams(location.search);
+const ES_LENTE = params.get('modo') === 'lente';
+if (ES_LENTE) document.documentElement.classList.add('en-lente');
 const AGENT_ID = params.get('agente') || 'agent_6601m4h8e93nf5ptap3xaxs29bke';
 const SDK_URLS = [
   'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.26.0/+esm',
@@ -324,10 +330,10 @@ const texPetalo = lienzo(64, 64, (c, w, h) => {
 const canvas = document.getElementById('escena');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true, preserveDrawingBuffer: true });
 const PRUEBA = params.has('prueba');
-renderer.setPixelRatio(PRUEBA ? 0.6 : Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(ES_LENTE ? Math.min(devicePixelRatio, 1.1) : PRUEBA ? 0.6 : Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !ES_LENTE;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
@@ -944,12 +950,20 @@ function calcularBoca(ahora, vol, freq) {
 let conv = null, modo = 'quieta', conectando = false;
 const $ = (id) => document.getElementById(id);
 const ui = { estado: $('estado'), hablar: $('btnHablar'), demo: $('btnDemo'), frente: $('btnFrente'), charla: $('charla'), txt: $('txt'), enviar: $('btnEnviar'), form: $('formEscribir') };
-function setEstado(m, texto) { modo = m; ui.estado.dataset.modo = m; ui.estado.querySelector('span').textContent = texto; }
+function avisarLente(tipo, datos = {}) {
+  if (ES_LENTE && window.parent !== window)
+    window.parent.postMessage({ fuente: 'mirta-avatar', tipo, ...datos }, location.origin);
+}
+function setEstado(m, texto) {
+  modo = m; ui.estado.dataset.modo = m; ui.estado.querySelector('span').textContent = texto;
+  avisarLente('estado', { modo: m, texto, activa: m === 'escucha' || (m === 'habla' && !!conv) });
+}
 function anotar(quien, texto) {
   const v = ui.charla.querySelector('.vacia'); if (v) v.remove();
   const li = document.createElement('li'); if (quien === 'vos') li.className = 'vos';
   const b = document.createElement('b'); b.textContent = quien === 'vos' ? 'Vos: ' : 'Mirta: ';
   li.append(b, document.createTextNode(texto)); ui.charla.append(li); ui.charla.scrollTop = ui.charla.scrollHeight;
+  avisarLente('mensaje', { quien, texto });
 }
 async function cargarSDK() {
   for (const u of SDK_URLS) { try { return await import(u); } catch (e) { console.warn('No cargó', u, e); } }
@@ -1006,6 +1020,25 @@ ui.hablar.addEventListener('click', () => conv ? terminarCharla() : empezarCharl
 ui.form.addEventListener('submit', (e) => {
   e.preventDefault(); const t = ui.txt.value.trim(); if (!t || !conv) return;
   try { conv.sendUserMessage(t); anotar('vos', t); ui.txt.value = ''; } catch (err) { setEstado('error', 'No se pudo mandar el mensaje. Probá de nuevo.'); }
+});
+// El lente controla la misma Mirta que se usa en esta página, sin duplicar el agente.
+window.addEventListener('message', (event) => {
+  if (!ES_LENTE || event.origin !== location.origin || event.source !== window.parent) return;
+  const m = event.data;
+  if (!m || m.fuente !== 'lente-dia') return;
+  if (m.tipo === 'hablar') {
+    if (conv) terminarCharla();
+    else if (!conectando) empezarCharla();
+  } else if (m.tipo === 'terminar' && (conv || conectando)) {
+    if (conv) terminarCharla();
+  } else if (m.tipo === 'escribir') {
+    const t = typeof m.texto === 'string' ? m.texto.trim().slice(0, 500) : '';
+    if (!conv) { setEstado('quieta', 'Primero tocá «Hablar» para iniciar la charla.'); return; }
+    if (t) {
+      try { conv.sendUserMessage(t); anotar('vos', t); }
+      catch (err) { setEstado('error', 'No se pudo mandar el mensaje. Probá de nuevo.'); }
+    }
+  }
 });
 
 /* ============================================================
@@ -1073,6 +1106,15 @@ const card = document.querySelector('.almanaque');
 function encuadrar() {
   const W = innerWidth, H = innerHeight;
   renderer.setSize(W, H, false);
+  if (ES_LENTE) {
+    camera.clearViewOffset();
+    camera.aspect = W / Math.max(1,H);
+    FRENTE_POS.set(0, 0.72, 3.4);
+    FRENTE_TGT.set(0, 0.47, -0.08);
+    controls.maxDistance = 5;
+    camera.updateProjectionMatrix();
+    return;
+  }
   const movil = W <= 760;
   const r = card.getBoundingClientRect();
   if (movil) {
@@ -1276,6 +1318,7 @@ window.__mirta = {
 document.getElementById('cargando').remove();
 probarGLB();
 requestAnimationFrame(animar);
+avisarLente('listo', { texto: 'Doña Mirta está lista para conversar.' });
 </script>
 </body>
 </html>

@@ -140,7 +140,7 @@ header h1{font-size:15px;font-weight:700;opacity:.92}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>
     <span id="txtHablar">Hablar</span>
   </button>
-  <button class="btn" id="btnEscribir" type="button" aria-expanded="false">
+  <button class="btn" id="btnEscribir" type="button" aria-expanded="false" disabled>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>
     <span>Escribir</span>
   </button>
@@ -488,16 +488,16 @@ window.addEventListener('message', (event) => {
   if (!m || m.fuente !== 'mirta-avatar') return;
   if (m.tipo === 'listo') {
     est.avatarListo = true; el.esperando.hidden = true;
-    el.btnHablar.disabled = false;
+    el.btnHablar.disabled = !est.camara;
     mensaje(est.visible ? '¡Doña Mirta está lista! Tocá «Hablar» para conversar.' :
       'Mirta está lista. Enfocá la lámina para verla.', 'ok');
   } else if (m.tipo === 'estado') {
     est.conversando = !!m.activa;
     est.conectando = typeof m.texto === 'string' && /abriendo la ventana/i.test(m.texto);
-    el.btnHablar.disabled = est.conectando;
+    el.btnHablar.disabled = est.conectando || !est.camara || !est.avatarListo;
     el.txtHablar.textContent = est.conversando ? 'Terminar charla' : 'Hablar';
     el.txtChat.disabled = el.btnEnviar.disabled = !est.conversando;
-    if (typeof m.texto === 'string') mensaje(m.texto, m.modo === 'error' ? 'mal' : est.conversando ? 'ok' : '');
+    if (est.camara && typeof m.texto === 'string') mensaje(m.texto, m.modo === 'error' ? 'mal' : est.conversando ? 'ok' : '');
   } else if (m.tipo === 'mensaje' && typeof m.texto === 'string') {
     const li = document.createElement('li');
     const b = document.createElement('strong');
@@ -562,6 +562,7 @@ async function abrirCamara() {
   el.inicio.style.display = 'none';
   el.guia.style.display = 'block'; el.guia.classList.remove('oculta');
   est.camara = true; est.visto = 0; est.suave = null; seguidor.s.H = null;
+  el.btnHablar.disabled = !est.avatarListo; el.btnEscribir.disabled = false;
   el.txtCamara.textContent = 'Cerrar cámara';
   cargarAvatar();
   mensaje('Buscando la lámina… Enfocala completa con buena luz.');
@@ -575,6 +576,7 @@ function cerrarCamara() {
   ocultarAR(); el.guia.style.display = 'none';
   el.inicio.style.display = 'block';
   el.panelChat.hidden = true; el.btnEscribir.setAttribute('aria-expanded', 'false');
+  el.btnHablar.disabled = true; el.btnEscribir.disabled = true;
   el.txtCamara.textContent = 'Abrir cámara';
   mensaje('Tocá «Abrir cámara» y enfocá la lámina.');
 }

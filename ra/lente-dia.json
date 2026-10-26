@@ -1,6 +1,6 @@
 {
   "proyecto": "Lente DIA · Doña Mirta",
-  "version": 2,
+  "version": 3,
   "autoria": "IA al Colorado · Auxiliar en IA 2026 · Instructivo 42, Paso 3",
   "personaje": {
     "nombre": "Doña Mirta",
@@ -26,31 +26,29 @@
     ]
   },
   "contenido": {
-    "tipo": "video",
-    "archivo": "video-mirta.mp4",
+    "tipo": "humano_digital_interactivo",
+    "pagina": "../index.html?modo=lente",
     "region": {
       "x": 0.1081,
       "y": 0.2588,
       "ancho": 0.7839,
       "alto": 0.5542
     },
-    "ajuste": "adaptar",
-    "posicion": "50% 50%",
-    "bucle": true,
-    "sonido": "Arranca sin sonido (los navegadores lo exigen) hasta tocar «Activar sonido» o «Reproducir video»",
-    "formato": "MP4 H.264 + AAC, 1280 x 604, 38,7 s, con su audio original",
-    "reproduccionBloqueada": "si el navegador no deja reproducir, aparece el botón «Reproducir video»"
+    "descripcion": "Avatar 3D vivo de Doña Mirta con voz de ElevenLabs y mensajes escritos, anclado al marcador",
+    "interaccion": "Permiso de cámara al abrir el lente; permiso de micrófono solo al tocar Hablar",
+    "alternativa": "../index.html"
   },
   "botones": [
     "Abrir cámara",
-    "Activar sonido"
+    "Hablar / Terminar charla",
+    "Escribir"
   ],
   "seguimiento": {
     "motor": "propio (FAST + descriptores binarios + homografía RANSAC), sin librerías externas",
     "anchoAnalisis": 560,
     "anchoMarcador": 800,
-    "intervaloMs": 40,
-    "memoriaMs": 450,
+    "intervaloMs": 65,
+    "memoriaMs": 800,
     "minimoInliers": 14
   },
   "publicacion": {

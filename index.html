@@ -947,7 +947,7 @@ function calcularBoca(ahora, vol, freq) {
 /* ============================================================
    Conversación con ElevenLabs
    ============================================================ */
-let conv = null, modo = 'quieta', conectando = false;
+let conv = null, modo = 'quieta', conectando = false, detenerPendiente = false;
 const $ = (id) => document.getElementById(id);
 const ui = { estado: $('estado'), hablar: $('btnHablar'), demo: $('btnDemo'), frente: $('btnFrente'), charla: $('charla'), txt: $('txt'), enviar: $('btnEnviar'), form: $('formEscribir') };
 function avisarLente(tipo, datos = {}) {
@@ -971,16 +971,21 @@ async function cargarSDK() {
 }
 async function empezarCharla() {
   if (conectando) return;
+  detenerPendiente = false;
   conectando = true; ui.hablar.disabled = true; pararDemo();
   setEstado('quieta', 'Abriendo la ventana…');
   try {
     const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop());
+    if (detenerPendiente) { conectando = false; ui.hablar.disabled = false; return; }
   } catch (e) {
     setEstado('error', 'No se pudo usar el micrófono. Revisá el permiso del navegador y volvé a tocar «Hablar».');
     conectando = false; ui.hablar.disabled = false; return;
   }
   let sdk;
-  try { sdk = await cargarSDK(); } catch (e) {
+  try {
+    sdk = await cargarSDK();
+    if (detenerPendiente) { conectando = false; ui.hablar.disabled = false; return; }
+  } catch (e) {
     setEstado('error', 'No se pudo cargar la conexión de voz. Revisá internet y probá de nuevo.');
     conectando = false; ui.hablar.disabled = false; return;
   }
@@ -1002,6 +1007,7 @@ async function empezarCharla() {
       onAudioAlignment: (al) => sumarAlineacion(al)
     });
     ui.hablar.textContent = 'Terminar la charla'; ui.hablar.classList.add('activo');
+    if (detenerPendiente) await terminarCharla();
   } catch (e) {
     console.error(e);
     setEstado('error', 'Doña Mirta no atendió. Revisá que el agente sea público en ElevenLabs y probá de nuevo.');
@@ -1030,6 +1036,7 @@ window.addEventListener('message', (event) => {
     if (conv) terminarCharla();
     else if (!conectando) empezarCharla();
   } else if (m.tipo === 'terminar' && (conv || conectando)) {
+    detenerPendiente = true;
     if (conv) terminarCharla();
   } else if (m.tipo === 'escribir') {
     const t = typeof m.texto === 'string' ? m.texto.trim().slice(0, 500) : '';
